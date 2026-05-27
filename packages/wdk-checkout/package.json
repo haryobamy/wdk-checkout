@@ -12,7 +12,16 @@
       "require": "./dist/index.js"
     }
   },
-  "files": ["dist", "src"],
+  "files": ["dist", "src", "LICENSE"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/haryobamy/wdk-checkout.git"
+  },
+  "homepage": "https://github.com/haryobamy/wdk-checkout#readme",
+  "bugs": {
+    "url": "https://github.com/haryobamy/wdk-checkout/issues"
+  },
+  "keywords": ["usdt", "tether", "wdk", "checkout", "crypto", "react-native", "react", "self-custodial", "erc20", "ethereum", "polygon"],
   "scripts": {
     "build": "tsup",
     "test": "jest",
