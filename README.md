@@ -1,8 +1,15 @@
 # wdk-checkout
 
+[![npm version](https://img.shields.io/npm/v/wdk-checkout.svg)](https://www.npmjs.com/package/wdk-checkout)
+[![license](https://img.shields.io/npm/l/wdk-checkout.svg)](./packages/wdk-checkout/LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
+[![powered by Tether WDK](https://img.shields.io/badge/powered%20by-Tether%20WDK-green.svg)](https://docs.wdk.tether.io/)
+
 > Self-custodial USDT checkout for React Native and React — powered by [Tether WDK](https://docs.wdk.tether.io/)
 
 `wdk-checkout` lets you add a fully self-custodial USDT payment flow to any React Native or React app in minutes. The buyer's wallet lives on their device, secured by biometrics. No custodian. No third-party. No signups. Just crypto.
+
+---
 
 ## Features
 
@@ -10,10 +17,11 @@
 - **Self-custodial** — seed phrases are generated on-device and never sent to a server
 - **Biometric secured** — native platforms use the device's secure enclave (Face ID / Touch ID / PIN)
 - **Real-time fee estimation** — users see the exact gas cost before confirming
+- **Two-step confirmation** — quote first, pay second — users never get surprised by fees
 - **ERC-4337 / gasless support** — optional bundler integration to sponsor gas on behalf of users
-- **Multi-network** — Ethereum mainnet, Polygon, and Sepolia testnet supported out of the box
+- **Multi-network** — Ethereum mainnet, Polygon, and Sepolia testnet out of the box
 - **Web compatible** — works in Next.js / browser environments via a custom `SecretStore`
-- **TypeScript first** — full type definitions included
+- **TypeScript first** — full type definitions included, zero `any` in your code
 
 ---
 
@@ -22,11 +30,11 @@
 ```
 User taps "Pay"
   → App unlocks their on-device wallet (biometric / PIN)
-  → Fetches a real-time fee estimate
-  → Shows the user the amount + fee to confirm
+  → Fetches a real-time fee estimate from the network
+  → Shows the user: amount + network fee — waiting for confirmation
   → User confirms → transaction is broadcast to the chain
-  → App polls for on-chain confirmation
-  → onSuccess fires with the txHash
+  → App polls for on-chain receipt
+  → onSuccess fires with the txHash and block number
 ```
 
 The seed phrase is generated once, encrypted by the device's secure enclave, and never leaves the device.
@@ -46,9 +54,25 @@ yarn add wdk-checkout react-native-keychain
 pnpm add wdk-checkout react-native-keychain
 ```
 
-> **React Native only:** Run `npx pod-install` after installing to link the native keychain module.
+**React Native / Expo — link native modules:**
 
-> **Web / Next.js:** `react-native-keychain` is not required. Pass a custom `secretStore` to `WDKCheckoutProvider` (see [Web usage](#web--nextjs-usage)).
+```bash
+npx pod-install   # iOS
+```
+
+**Web / Next.js — skip `react-native-keychain`:**
+
+`react-native-keychain` is a native module and is not required on web. Just pass a custom `secretStore` to the provider (see [Web usage](#web--nextjs-usage)).
+
+---
+
+## Peer dependencies
+
+| Package | Version | Required on |
+|---------|---------|-------------|
+| `react` | `>=18.0.0` | All platforms |
+| `react-native` | `>=0.73.0` | React Native / Expo only |
+| `react-native-keychain` | `>=8.0.0` | React Native / Expo only |
 
 ---
 
@@ -107,13 +131,13 @@ export function CheckoutScreen() {
 }
 ```
 
-That's it. `WDKCheckout` handles everything — wallet creation (first time), fee estimation, confirmation prompt, broadcasting, and receipt polling.
+That's it. `WDKCheckout` handles everything automatically — wallet creation on first use, biometric unlock, fee display, user confirmation, broadcasting, and receipt polling.
 
 ---
 
 ## Web / Next.js usage
 
-On web, `react-native-keychain` is not available. You must provide a `secretStore` yourself. For demos, `MemorySecretStore` works. For production, implement your own encrypted storage (e.g. Web Crypto API + IndexedDB).
+On web, `react-native-keychain` is unavailable. Provide a `secretStore` yourself. For demos, the built-in `MemorySecretStore` works. For production, implement your own persistent encrypted storage (e.g. Web Crypto API + IndexedDB).
 
 ```tsx
 // app/providers.tsx  (Next.js App Router)
@@ -168,11 +192,11 @@ export default function StorePage() {
 
 ## Supported networks
 
-| Network    | `network` value | Chain ID | USDT contract |
-|------------|-----------------|----------|---------------|
-| Ethereum   | `"ethereum"`    | `1`      | `0xdAC17F958D2ee523a2206206994597C13D831ec7` |
-| Polygon    | `"polygon"`     | `137`    | `0xc2132D05D31c914a87C6611C10748AEb04B58e8F` |
-| Sepolia    | `"sepolia"`     | `11155111` | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` |
+| Network  | `network` value | Chain ID   | USDT contract address |
+|----------|-----------------|------------|----------------------|
+| Ethereum | `"ethereum"`    | `1`        | `0xdAC17F958D2ee523a2206206994597C13D831ec7` |
+| Polygon  | `"polygon"`     | `137`      | `0xc2132D05D31c914a87C6611C10748AEb04B58e8F` |
+| Sepolia  | `"sepolia"`     | `11155111` | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` |
 
 ---
 
@@ -180,7 +204,7 @@ export default function StorePage() {
 
 ### `<WDKCheckoutProvider>`
 
-Wrap your app (or checkout screen) with this provider. It holds your network config and exposes it to all child hooks and components.
+Top-level context provider. Wrap your app or checkout screen with it. All hooks and components must be descendants of this provider.
 
 ```tsx
 <WDKCheckoutProvider config={config}>
@@ -192,20 +216,21 @@ Wrap your app (or checkout screen) with this provider. It holds your network con
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `networks` | `Partial<Record<Network, NetworkConfig>>` | — | **Required.** Network config keyed by network name |
+| `networks` | `Partial<Record<Network, NetworkConfig>>` | — | **Required.** Network configuration keyed by network name |
 | `gasless` | `boolean` | `false` | Enable ERC-4337 gasless payments via a bundler |
 | `secretStore` | `SecretStore` | Keychain (native) | Custom seed phrase storage adapter |
-| `confirmationTimeout` | `number` (ms) | `300000` (5 min) | How long to wait for on-chain receipt before timing out |
-| `pollInterval` | `number` (ms) | `3000` (3 sec) | How often to poll for the transaction receipt |
+| `confirmationTimeout` | `number` (ms) | `300_000` (5 min) | How long to poll for on-chain receipt before timing out |
+| `pollInterval` | `number` (ms) | `3_000` (3 sec) | How often to poll `eth_getTransactionReceipt` |
 
 #### `NetworkConfig` shape
 
 ```ts
 {
-  rpcUrl: string           // JSON-RPC endpoint for this network
-  chainId: number          // EIP-155 chain ID
-  usdtAddress: string      // USDT ERC-20 contract address
-  // ERC-4337 gasless fields (all required together if gasless: true)
+  rpcUrl: string            // JSON-RPC endpoint for this network
+  chainId: number           // EIP-155 chain ID
+  usdtAddress: string       // USDT ERC-20 contract address on this network
+
+  // ERC-4337 gasless fields — required when gasless: true
   bundlerUrl?: string
   entryPointAddress?: string
   safeModulesVersion?: string
@@ -217,14 +242,19 @@ Wrap your app (or checkout screen) with this provider. It holds your network con
 
 ### `<WDKCheckout>`
 
-The all-in-one drop-in checkout component. Renders the right UI for every state automatically:
+The all-in-one drop-in checkout component. Renders the correct UI for every payment state automatically — no state management needed on your side.
 
-- **First time user** → shows wallet creation screen
-- **Returning user** → unlocks wallet via biometrics and fetches fee
-- **Fee confirmation** → shows amount + network fee, waits for user to confirm
-- **Broadcasting** → shows spinner while tx is sent
-- **Confirming** → polls for on-chain receipt
-- **Success / Error** → fires your callback
+**What it renders at each stage:**
+
+| State | UI shown |
+|-------|----------|
+| First-time user | Wallet setup screen (see `<WDKWalletSetup>`) |
+| Returning user | Pay button, unlocks wallet on press |
+| Loading / fetching fee | Spinner with status label |
+| Fee confirmation | Amount + network fee + Confirm & Cancel buttons |
+| Broadcasting / confirming | Spinner |
+| Success | "Payment sent!" with txHash |
+| Error | Error message + Try again button |
 
 ```tsx
 <WDKCheckout
@@ -238,72 +268,118 @@ The all-in-one drop-in checkout component. Renders the right UI for every state 
 />
 ```
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `amount` | `string` | Payment amount as a decimal string e.g. `"5.00"` |
-| `currency` | `"USDT"` | Currency (currently only USDT) |
-| `network` | `Network` | Which network to use — must be configured in the provider |
-| `recipientAddress` | `string` | The seller's wallet address that receives the funds |
-| `onSuccess` | `(result: PaymentResult) => void` | Fired after on-chain confirmation |
-| `onCancel` | `() => void` | Fired when the user taps Cancel |
-| `onError` | `(error: WDKCheckoutError) => void` | Fired on any unrecoverable error |
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `amount` | `string` | Yes | Payment amount as a decimal string — e.g. `"5.00"` |
+| `currency` | `"USDT"` | Yes | Currency — currently only USDT is supported |
+| `network` | `Network` | Yes | Which network to use — must be in the provider config |
+| `recipientAddress` | `string` | Yes | The seller's wallet address that receives the USDT |
+| `onSuccess` | `(result: PaymentResult) => void` | Yes | Fired once the transaction is confirmed on-chain |
+| `onCancel` | `() => void` | Yes | Fired when the user taps Cancel |
+| `onError` | `(error: WDKCheckoutError) => void` | Yes | Fired on any unrecoverable error |
 
 #### `PaymentResult`
 
 ```ts
 {
-  txHash: string    // on-chain transaction hash
-  amount: string    // the amount that was sent e.g. "5.00"
-  network: Network  // which network the tx was on
+  txHash: string    // on-chain transaction hash  e.g. "0xabc123..."
+  amount: string    // amount sent  e.g. "5.00"
+  network: Network  // which network the transaction was on
   fee: bigint       // gas fee paid in wei
 }
 ```
 
 ---
 
+### `<WDKWalletSetup>`
+
+Shown automatically by `<WDKCheckout>` when no wallet exists on the device. You can also use it standalone to build a custom onboarding flow.
+
+```tsx
+import { WDKWalletSetup } from 'wdk-checkout'
+import { useWDKPayment } from 'wdk-checkout'
+
+function OnboardingScreen() {
+  const { createWallet } = useWDKPayment({
+    network: 'ethereum',
+    recipientAddress: '0x...',
+  })
+
+  return (
+    <WDKWalletSetup
+      createWallet={createWallet}
+      onWalletCreated={() => {
+        // wallet is ready — navigate to checkout
+      }}
+      onError={(error) => {
+        console.error(error.code, error.message)
+      }}
+    />
+  )
+}
+```
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `createWallet` | `() => Promise<void>` | Async function that generates and stores the seed phrase — pass `createWallet` from `useWDKPayment` |
+| `onWalletCreated` | `() => void` | Called after the wallet is successfully created |
+| `onError` | `(error: WDKCheckoutError) => void` | Called if wallet creation fails |
+
+---
+
 ### `useWDKPayment(options)` — build your own UI
 
-If you want full control over the UI, skip `<WDKCheckout>` and use the hook directly.
+Use this hook when you want full control over the UI. It exposes the full payment state machine.
 
 ```tsx
 import { useWDKPayment } from 'wdk-checkout'
 
 function MyCheckout() {
   const {
-    status,          // current state — see PaymentStatus below
+    status,          // current PaymentStatus — see table below
     walletAddress,   // buyer's wallet address once initialized
     feeEstimate,     // { fee: bigint, formatted: string } e.g. "0.001234 ETH"
-    txHash,          // set after broadcast
+    txHash,          // set after the transaction is broadcast
     error,           // WDKCheckoutError | null
-    initiatePayment, // call this to kick off the flow
-    confirmPayment,  // call this when user confirms the fee
-    cancelPayment,   // call this to reset everything
-    createWallet,    // call this to generate a new wallet (first-time users)
+    initiatePayment, // starts the payment flow
+    confirmPayment,  // called when user confirms the fee
+    cancelPayment,   // resets everything back to idle
+    createWallet,    // generates a new wallet for first-time users
   } = useWDKPayment({
     network: 'ethereum',
     recipientAddress: '0xYOUR_ADDRESS',
-    gasless: false,  // optional, overrides provider default
+    gasless: false,  // optional — overrides the provider default
   })
 
-  // Example: render based on status
   if (status === 'awaiting_wallet') {
-    return <Button onPress={createWallet} title="Create wallet" />
+    return (
+      <WDKWalletSetup
+        createWallet={createWallet}
+        onWalletCreated={() => initiatePayment({ amount: '5.00', currency: 'USDT' })}
+        onError={(e) => console.error(e)}
+      />
+    )
   }
 
   if (status === 'confirming_send' && feeEstimate) {
     return (
       <>
-        <Text>Fee: {feeEstimate.formatted}</Text>
+        <Text>Network fee: {feeEstimate.formatted}</Text>
         <Button onPress={confirmPayment} title="Confirm & Pay" />
         <Button onPress={cancelPayment} title="Cancel" />
       </>
     )
   }
 
+  if (status === 'success') {
+    return <Text>Paid! {txHash}</Text>
+  }
+
   return (
     <Button
       onPress={() => initiatePayment({ amount: '5.00', currency: 'USDT' })}
       title="Pay 5.00 USDT"
+      disabled={status !== 'idle'}
     />
   )
 }
@@ -313,37 +389,37 @@ function MyCheckout() {
 
 ```
 idle
-  └─► initiatePayment()
-        └─► initializing      (unlocking wallet)
-              ├─► awaiting_wallet   (no wallet found — prompt user to create one)
-              └─► ready            (wallet unlocked)
-                    └─► quoting         (fetching fee estimate)
-                          └─► confirming_send   (waiting for user to confirm)
-                                └─► confirmPayment()
-                                      └─► broadcasting       (sending tx)
-                                            └─► confirming_receipt  (polling for receipt)
-                                                  ├─► success
-                                                  └─► error
+ └─► initiatePayment({ amount, currency })
+       └─► initializing        ← unlocking wallet from secure storage
+             ├─► awaiting_wallet   ← no wallet found, prompt user to create one
+             └─► ready            ← wallet unlocked successfully
+                   └─► quoting       ← fetching real-time fee from network
+                         └─► confirming_send  ← waiting for user to confirm fee
+                               └─► confirmPayment()
+                                     └─► broadcasting      ← tx submitted to RPC
+                                           └─► confirming_receipt  ← polling for receipt
+                                                 ├─► success
+                                                 └─► error
 ```
 
-| Status | Meaning |
-|--------|---------|
-| `idle` | Nothing happening yet |
+| Status | What's happening |
+|--------|-----------------|
+| `idle` | No payment in progress |
 | `initializing` | Unlocking the on-device wallet |
-| `awaiting_wallet` | No wallet found — user needs to create one |
-| `ready` | Wallet unlocked, fee fetch starting |
+| `awaiting_wallet` | No wallet found — user needs to create one first |
+| `ready` | Wallet unlocked, fee fetch about to start |
 | `quoting` | Fetching real-time fee estimate from the network |
-| `confirming_send` | Showing fee to user, waiting for confirmation |
-| `broadcasting` | Transaction submitted to the network |
-| `confirming_receipt` | Polling `eth_getTransactionReceipt` |
+| `confirming_send` | Fee shown — waiting for user to tap Confirm |
+| `broadcasting` | Transaction submitted to the RPC node |
+| `confirming_receipt` | Polling `eth_getTransactionReceipt` for confirmation |
 | `success` | Transaction confirmed on-chain |
-| `error` | Something went wrong — check `error.code` |
+| `error` | Unrecoverable error — inspect `error.code` |
 
 ---
 
 ### `useWDKReceive(options)` — seller side
 
-Use this on the seller / merchant side to display the wallet address where payments should be sent (e.g. to generate a QR code).
+Use this on the merchant / seller side to display the wallet address for receiving payments, e.g. to show a QR code.
 
 ```tsx
 import { useWDKReceive } from 'wdk-checkout'
@@ -366,7 +442,7 @@ function ReceiveScreen() {
 
 ### `useWalletState()` — check if a wallet exists
 
-Check whether the user already has a wallet set up on this device.
+Quickly check whether the user already has a wallet set up, without starting a payment flow. Useful for conditional onboarding.
 
 ```tsx
 import { useWalletState } from 'wdk-checkout'
@@ -380,47 +456,53 @@ function HomeScreen() {
 }
 ```
 
+| Return value | Type | Description |
+|--------------|------|-------------|
+| `exists` | `boolean` | `true` if a seed phrase is stored on this device |
+| `isChecking` | `boolean` | `true` while the async storage check is in progress |
+
 ---
 
 ### `WDKCheckoutError`
 
-Every error thrown by this library is a `WDKCheckoutError`. It extends `Error` and adds a `code` property so you can handle specific failure cases.
+Every error thrown by this library is an instance of `WDKCheckoutError`. It extends the native `Error` class and adds a typed `code` property so you can handle specific failure cases cleanly.
 
 ```ts
-try {
-  await engine.send('5.00')
-} catch (err) {
-  if (err instanceof WDKCheckoutError) {
-    switch (err.code) {
-      case 'INSUFFICIENT_BALANCE':
-        showToast('Not enough USDT in your wallet.')
-        break
-      case 'BIOMETRIC_CANCELLED':
-        showToast('Authentication cancelled.')
-        break
-      default:
-        showToast('Payment failed: ' + err.message)
-    }
+import { WDKCheckoutError } from 'wdk-checkout'
+
+function handleError(error: WDKCheckoutError) {
+  switch (error.code) {
+    case 'INSUFFICIENT_BALANCE':
+      showToast('Not enough USDT in your wallet.')
+      break
+    case 'BIOMETRIC_CANCELLED':
+      showToast('Authentication cancelled. Try again.')
+      break
+    case 'CONFIRMATION_TIMEOUT':
+      showToast('Transaction is taking longer than expected. Check your wallet.')
+      break
+    default:
+      showToast('Payment failed: ' + error.message)
   }
 }
 ```
 
-| Code | When it's thrown |
-|------|-----------------|
-| `WALLET_INIT_FAILED` | Wallet could not be initialized — missing seed or network error |
+| Code | When it is thrown |
+|------|------------------|
+| `WALLET_INIT_FAILED` | Wallet could not be initialized — corrupted seed or network error |
 | `BIOMETRIC_CANCELLED` | User dismissed the biometric / PIN prompt |
-| `BIOMETRIC_UNAVAILABLE` | Device doesn't support biometrics or none are enrolled |
-| `INSUFFICIENT_BALANCE` | Wallet doesn't have enough USDT or ETH to cover amount + fee |
+| `BIOMETRIC_UNAVAILABLE` | Device has no biometrics enrolled or the feature is locked |
+| `INSUFFICIENT_BALANCE` | Wallet does not have enough USDT or ETH to cover amount + fee |
 | `BROADCAST_FAILED` | RPC rejected the transaction or it reverted on-chain |
-| `CONFIRMATION_TIMEOUT` | Receipt not found within `confirmationTimeout` |
-| `WEB_STORAGE_REQUIRED` | Running on web with no `secretStore` provided |
-| `NETWORK_UNSUPPORTED` | The requested network isn't in the provider config |
+| `CONFIRMATION_TIMEOUT` | Transaction receipt not found within `confirmationTimeout` |
+| `WEB_STORAGE_REQUIRED` | Running on web with no `secretStore` provided to the provider |
+| `NETWORK_UNSUPPORTED` | The requested network is not in the provider config |
 
 ---
 
 ## Gasless payments (ERC-4337)
 
-Skip gas fees for your users by routing transactions through an ERC-4337 bundler with a paymaster. This uses Tether's `wdk-wallet-evm-erc-4337` under the hood.
+Sponsor gas fees for your users by routing transactions through an ERC-4337 bundler with a paymaster. Under the hood this uses Tether's `wdk-wallet-evm-erc-4337`.
 
 ```tsx
 const config = {
@@ -437,36 +519,36 @@ const config = {
       },
     },
   },
-  gasless: true,
+  gasless: true,  // <-- enables ERC-4337 mode
 }
 ```
 
-> The `erc4337` object is passed directly to `WalletManagerEvmErc4337` — include any extra fields your bundler requires.
+> The `erc4337` object is passed directly to the underlying `WalletManagerEvmErc4337` — include any additional fields your bundler requires.
 
 ---
 
 ## Custom `SecretStore`
 
-By default, seed phrases are stored in the device keychain using `react-native-keychain` with biometric protection. To use your own storage backend, implement the `SecretStore` interface:
+By default on React Native, seed phrases are stored via `react-native-keychain` with biometric protection backed by the device's secure enclave. To bring your own storage backend, implement the `SecretStore` interface:
 
 ```ts
 import type { SecretStore } from 'wdk-checkout'
 
 class MyEncryptedStore implements SecretStore {
   async save(seed: string): Promise<void> {
-    // encrypt and persist seed
+    // encrypt and persist the seed phrase
   }
 
   async load(): Promise<string | null> {
-    // decrypt and return seed, or null if not set
+    // decrypt and return the seed phrase, or null if not set
   }
 
   async clear(): Promise<void> {
-    // delete stored seed
+    // permanently delete the stored seed phrase
   }
 
   async exists(): Promise<boolean> {
-    // return true if a seed is stored
+    // return true if a seed phrase is currently stored
   }
 }
 
@@ -476,30 +558,47 @@ class MyEncryptedStore implements SecretStore {
 
 ---
 
-## Testing
+## TypeScript types
 
-`MemorySecretStore` is exported for use in tests and web demos. It holds the seed in memory only — safe for tests, **not for production**.
+All public types are exported from `wdk-checkout`:
 
 ```ts
-import { WalletManager, MemorySecretStore } from 'wdk-checkout'
+import type {
+  Network,              // 'ethereum' | 'polygon' | 'sepolia'
+  NetworkConfig,        // rpcUrl, chainId, usdtAddress, ...
+  WDKCheckoutConfig,    // full provider config shape
+  PaymentParams,        // { amount: string, currency: 'USDT' }
+  PaymentResult,        // { txHash, amount, network, fee }
+  PaymentStatus,        // all 10 status string literals
+  FeeEstimate,          // { fee: bigint, formatted: string }
+  WDKCheckoutProps,     // props for <WDKCheckout>
+  UseWDKPaymentOptions, // options for useWDKPayment()
+  UseWDKReceiveOptions, // options for useWDKReceive()
+  SecretStore,          // interface for custom storage adapters
+  WDKCheckoutErrorCode, // all 8 error code string literals
+} from 'wdk-checkout'
+```
+
+---
+
+## Testing
+
+`MemorySecretStore` is exported for use in unit tests and web demos. It stores the seed phrase in memory only — safe for tests, **not for production**.
+
+```ts
+import { MemorySecretStore } from 'wdk-checkout'
 
 const store = new MemorySecretStore()
 await store.save('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about')
 
-const manager = new WalletManager({
-  network: 'sepolia',
-  config: { rpcUrl: '...', chainId: 11155111, usdtAddress: '0x...' },
-  gasless: false,
-  secretStore: store,
-})
-
-const wallet = await manager.init()
-console.log(wallet.address) // => 0x...
+const exists = await store.exists() // true
+const seed   = await store.load()   // returns the seed phrase
+await store.clear()
 ```
 
-### Integration test (Sepolia)
+### Integration test (Sepolia testnet)
 
-A real end-to-end test is included. It auto-skips when env vars are absent:
+A full end-to-end integration test is included in the repo. It auto-skips if environment variables are not set, so it never breaks CI:
 
 ```bash
 INTEGRATION_SEED_PHRASE="your twelve words here" \
@@ -510,84 +609,18 @@ pnpm test -- --testPathPattern=integration
 
 ---
 
-## Project structure
-
-```
-packages/wdk-checkout/
-├── src/
-│   ├── core/
-│   │   ├── WDKCheckoutError.ts     # Typed error class
-│   │   ├── WalletManager.ts        # WDK wallet lifecycle (init / dispose)
-│   │   ├── PaymentEngine.ts        # quote() and send()
-│   │   └── TransactionMonitor.ts   # eth_getTransactionReceipt polling
-│   ├── hooks/
-│   │   ├── useWDKPayment.ts        # Full payment state machine
-│   │   ├── useWDKReceive.ts        # Seller address resolution
-│   │   └── useWalletState.ts       # Wallet exists check
-│   ├── components/
-│   │   ├── WDKCheckoutProvider.tsx  # React context + config
-│   │   ├── WDKCheckout.tsx          # Web drop-in component
-│   │   ├── WDKCheckout.native.tsx   # React Native drop-in component
-│   │   ├── WDKWalletSetup.tsx       # Web wallet creation UI
-│   │   └── WDKWalletSetup.native.tsx # RN wallet creation UI
-│   ├── storage/
-│   │   ├── SecretStore.ts           # Interface + web stub
-│   │   └── SecretStore.native.ts    # react-native-keychain implementation
-│   └── testing/
-│       └── MemorySecretStore.ts     # In-memory store for tests
-examples/
-├── expo-demo/     # Expo app example
-└── nextjs-demo/   # Next.js 14 app example
-```
-
----
-
 ## Security
 
-- Seed phrases are stored using `react-native-keychain` with `BIOMETRY_CURRENT_SET` access control and `SECURE_HARDWARE` security level — they live in the device's secure enclave
-- The seed phrase is **never transmitted** over the network
-- Each transaction requires explicit biometric / PIN confirmation
-- Use `ACCESS_CONTROL.BIOMETRY_CURRENT_SET` — the key becomes invalid if biometrics change (e.g. a new fingerprint is added)
+- Seed phrases are stored using `react-native-keychain` with `BIOMETRY_CURRENT_SET` access control and `SECURE_HARDWARE` security level — backed by the device's secure enclave (Keystore on Android, Secure Enclave on iOS)
+- The seed phrase is **never transmitted** over any network
+- Each transaction requires explicit biometric or PIN confirmation from the user
+- `BIOMETRY_CURRENT_SET` means the stored key is invalidated if new biometrics are enrolled — protecting against an attacker adding their own fingerprint
 
 ---
 
-## TypeScript types reference
+## Contributing
 
-Key types exported from `wdk-checkout`:
-
-```ts
-import type {
-  Network,           // 'ethereum' | 'polygon' | 'sepolia'
-  NetworkConfig,
-  WDKCheckoutConfig,
-  PaymentParams,
-  PaymentResult,
-  PaymentStatus,
-  FeeEstimate,
-  WDKCheckoutProps,
-  UseWDKPaymentOptions,
-  SecretStore,
-  WDKCheckoutErrorCode,
-} from 'wdk-checkout'
-```
-
-**`FeeEstimate`**
-
-```ts
-{
-  fee: bigint        // gas fee in wei
-  formatted: string  // human-readable e.g. "0.001234 ETH"
-}
-```
-
-**`PaymentParams`**
-
-```ts
-{
-  amount: string     // decimal string e.g. "5.00"
-  currency: 'USDT'
-}
-```
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, running tests, and the project architecture.
 
 ---
 
