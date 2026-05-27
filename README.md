@@ -1,7 +1,8 @@
 # wdk-checkout
 
 [![npm version](https://img.shields.io/npm/v/wdk-checkout.svg)](https://www.npmjs.com/package/wdk-checkout)
-[![license](https://img.shields.io/npm/l/wdk-checkout.svg)](./packages/wdk-checkout/LICENSE)
+[![npm downloads](https://img.shields.io/npm/dm/wdk-checkout.svg)](https://www.npmjs.com/package/wdk-checkout)
+[![license](https://img.shields.io/npm/l/wdk-checkout.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
 [![powered by Tether WDK](https://img.shields.io/badge/powered%20by-Tether%20WDK-green.svg)](https://docs.wdk.tether.io/)
 
