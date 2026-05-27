@@ -140,6 +140,27 @@ That's it. `WDKCheckout` handles everything automatically — wallet creation on
 
 On web, `react-native-keychain` is unavailable. Provide a `secretStore` yourself. For demos, the built-in `MemorySecretStore` works. For production, implement your own persistent encrypted storage (e.g. Web Crypto API + IndexedDB).
 
+### Required: `next.config.js` webpack fix
+
+The WDK packages use `sodium-universal` which tries to load `sodium-native` (a native C addon). Add this to your `next.config.js` to tell webpack to skip it — `sodium-universal` will automatically fall back to its pure JS implementation:
+
+```js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  webpack: (config) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      'sodium-native': false,
+    }
+    return config
+  },
+}
+
+module.exports = nextConfig
+```
+
+Without this you will see: `Module not found: Can't resolve 'sodium-native'`.
+
 ```tsx
 // app/providers.tsx  (Next.js App Router)
 'use client'
