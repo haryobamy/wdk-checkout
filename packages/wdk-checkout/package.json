@@ -1,6 +1,6 @@
 {
   "name": "wdk-checkout",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Self-custodial USDT checkout for React Native and React, powered by Tether WDK",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -12,7 +12,7 @@
       "require": "./dist/index.js"
     }
   },
-  "files": ["dist", "src", "LICENSE"],
+  "files": ["dist", "src", "LICENSE", "README.md"],
   "repository": {
     "type": "git",
     "url": "https://github.com/haryobamy/wdk-checkout.git"
