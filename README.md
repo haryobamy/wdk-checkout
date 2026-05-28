@@ -142,7 +142,7 @@ On web, `react-native-keychain` is unavailable. Provide a `secretStore` yourself
 
 ### Required: `next.config.js` webpack fix
 
-The WDK packages use `sodium-universal` which tries to load `sodium-native` (a native C addon). Add this to your `next.config.js` to tell webpack to skip it — `sodium-universal` will automatically fall back to its pure JS implementation:
+The WDK packages use `sodium-universal` which tries to load `sodium-native` (a native C addon). In a browser/Next.js environment this fails. Add the following to your `next.config.js` — it aliases `sodium-universal` directly to its pure JS implementation so all cryptographic functions work correctly in the browser:
 
 ```js
 /** @type {import('next').NextConfig} */
@@ -152,6 +152,10 @@ const nextConfig = {
       ...config.resolve.fallback,
       'sodium-native': false,
     }
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'sodium-universal': require.resolve('sodium-javascript'),
+    }
     return config
   },
 }
@@ -159,7 +163,9 @@ const nextConfig = {
 module.exports = nextConfig
 ```
 
-Without this you will see: `Module not found: Can't resolve 'sodium-native'`.
+Without this you will see one of these errors:
+- `Module not found: Can't resolve 'sodium-native'`
+- `TypeError: sodium_memzero is not a function`
 
 ```tsx
 // app/providers.tsx  (Next.js App Router)

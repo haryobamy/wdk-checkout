@@ -1,6 +1,6 @@
 {
   "name": "wdk-checkout",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "Self-custodial USDT checkout for React Native and React, powered by Tether WDK",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

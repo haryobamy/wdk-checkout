@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useWDKPayment } from '../hooks/useWDKPayment'
 import { WDKWalletSetup } from './WDKWalletSetup'
 import type { WDKCheckoutProps } from '../types'
@@ -24,6 +24,19 @@ export function WDKCheckout({
     createWallet,
   } = useWDKPayment({ network, recipientAddress })
 
+  // Fire callbacks only once when status changes — never in the render body
+  useEffect(() => {
+    if (status === 'success' && txHash) {
+      onSuccess({ txHash, amount, network, fee: feeEstimate?.fee ?? 0n })
+    }
+  }, [status, txHash])
+
+  useEffect(() => {
+    if (status === 'error' && error) {
+      onError(error)
+    }
+  }, [status, error])
+
   const container: React.CSSProperties = {
     padding: 32, textAlign: 'center', fontFamily: 'system-ui, sans-serif',
     maxWidth: 400, margin: '0 auto',
@@ -40,7 +53,6 @@ export function WDKCheckout({
   }
 
   if (status === 'success' && txHash) {
-    onSuccess({ txHash, amount, network, fee: feeEstimate?.fee ?? 0n })
     return (
       <div style={container}>
         <p style={{ color: '#22c55e', fontSize: 20, fontWeight: 700 }}>Payment sent!</p>
@@ -50,7 +62,6 @@ export function WDKCheckout({
   }
 
   if (status === 'error' && error) {
-    onError(error)
     return (
       <div style={container}>
         <p style={{ color: '#ef4444' }}>{error.message}</p>

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native'
 import { useWDKPayment } from '../hooks/useWDKPayment'
 import { WDKWalletSetup } from './WDKWalletSetup.native'
@@ -25,6 +25,19 @@ export function WDKCheckout({
     createWallet,
   } = useWDKPayment({ network, recipientAddress })
 
+  // Fire callbacks only once when status changes — never in the render body
+  useEffect(() => {
+    if (status === 'success' && txHash) {
+      onSuccess({ txHash, amount, network, fee: feeEstimate?.fee ?? 0n })
+    }
+  }, [status, txHash])
+
+  useEffect(() => {
+    if (status === 'error' && error) {
+      onError(error)
+    }
+  }, [status, error])
+
   if (status === 'awaiting_wallet') {
     return (
       <WDKWalletSetup
@@ -36,7 +49,6 @@ export function WDKCheckout({
   }
 
   if (status === 'success' && txHash) {
-    onSuccess({ txHash, amount, network, fee: feeEstimate?.fee ?? 0n })
     return (
       <View style={styles.container}>
         <Text style={styles.successText}>Payment sent!</Text>
@@ -46,7 +58,6 @@ export function WDKCheckout({
   }
 
   if (status === 'error' && error) {
-    onError(error)
     return (
       <View style={styles.container}>
         <Text style={styles.errorText}>{error.message}</Text>
