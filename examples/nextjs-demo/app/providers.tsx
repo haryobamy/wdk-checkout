@@ -1,10 +1,10 @@
 'use client'
-import { WDKCheckoutProvider, MemorySecretStore } from 'wdk-checkout'
+import { WDKCheckoutProvider, LocalStorageSecretStore } from 'wdk-checkout'
 import { useMemo } from 'react'
 
-// On web, use MemorySecretStore (not for production — demo only)
+// LocalStorageSecretStore persists the seed across page refreshes (demo only — not for production)
 export function Providers({ children }: { children: React.ReactNode }) {
-  const secretStore = useMemo(() => new MemorySecretStore(), [])
+  const secretStore = useMemo(() => new LocalStorageSecretStore(), [])
 
   return (
     <WDKCheckoutProvider

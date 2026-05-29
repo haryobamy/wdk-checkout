@@ -33,3 +33,4 @@ export type { SecretStore } from './storage/SecretStore'
 
 // Testing utilities
 export { MemorySecretStore } from './testing/MemorySecretStore'
+export { LocalStorageSecretStore } from './testing/LocalStorageSecretStore'

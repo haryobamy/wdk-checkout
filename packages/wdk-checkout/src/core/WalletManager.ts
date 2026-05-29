@@ -54,7 +54,7 @@ export class WalletManager {
       } else {
         walletInst = new WalletManagerEvm(seed, {
           provider: config.rpcUrl,
-          transferMaxFee: 100_000_000_000_000n,
+          transferMaxFee: config.transferMaxFeeWei ?? 10_000_000_000_000_000n,
         })
       }
 

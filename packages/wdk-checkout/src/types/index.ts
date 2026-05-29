@@ -4,6 +4,8 @@ export interface NetworkConfig {
   rpcUrl: string
   chainId: number
   usdtAddress: string
+  // Maximum gas fee in wei the library will allow — defaults to 0.01 ETH (10_000_000_000_000_000n)
+  transferMaxFeeWei?: bigint
   // ERC-4337 gasless fields — all required together if gasless is enabled
   bundlerUrl?: string
   entryPointAddress?: string

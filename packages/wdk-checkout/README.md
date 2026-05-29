@@ -138,7 +138,7 @@ That's it. `WDKCheckout` handles everything automatically — wallet creation on
 
 ## Web / Next.js usage
 
-On web, `react-native-keychain` is unavailable. Provide a `secretStore` yourself. For demos, the built-in `MemorySecretStore` works. For production, implement your own persistent encrypted storage (e.g. Web Crypto API + IndexedDB).
+On web, `react-native-keychain` is unavailable. Provide a `secretStore` yourself. For development and demos, use the built-in `LocalStorageSecretStore` — it persists the seed phrase across page reloads. For production, implement your own persistent encrypted storage (e.g. Web Crypto API + IndexedDB).
 
 ### Required: `next.config.js` webpack fix
 
@@ -170,12 +170,12 @@ Without this you will see one of these errors:
 ```tsx
 // app/providers.tsx  (Next.js App Router)
 'use client'
-import { WDKCheckoutProvider, MemorySecretStore } from 'wdk-checkout'
+import { WDKCheckoutProvider, LocalStorageSecretStore } from 'wdk-checkout'
 import { useMemo } from 'react'
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  // MemorySecretStore is for demos only — not persistent across page reloads
-  const secretStore = useMemo(() => new MemorySecretStore(), [])
+  // LocalStorageSecretStore persists the seed phrase across page reloads (dev/demo only)
+  const secretStore = useMemo(() => new LocalStorageSecretStore(), [])
 
   return (
     <WDKCheckoutProvider
@@ -609,13 +609,22 @@ import type {
 
 ---
 
-## Testing
+## Testing utilities
 
-`MemorySecretStore` is exported for use in unit tests and web demos. It stores the seed phrase in memory only — safe for tests, **not for production**.
+Two built-in stores are exported for development and testing — **neither is safe for production**:
+
+| Store | Persists | Use case |
+|-------|----------|----------|
+| `LocalStorageSecretStore` | Yes — across page reloads | Web/Next.js development and demos |
+| `MemorySecretStore` | No — in-memory only | Unit tests |
 
 ```ts
-import { MemorySecretStore } from 'wdk-checkout'
+// Development / demos — survives page refreshes
+import { LocalStorageSecretStore } from 'wdk-checkout'
+const store = new LocalStorageSecretStore() // optional key: new LocalStorageSecretStore('my_key')
 
+// Unit tests — fresh state every time
+import { MemorySecretStore } from 'wdk-checkout'
 const store = new MemorySecretStore()
 await store.save('abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about')
 
